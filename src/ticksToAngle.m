@@ -1,4 +1,4 @@
-function T = ticksToAngle(tick, offset)
-    T = (tick * 360) / 4096 + offset;
+function T = ticksToAngle(tick)
+    T = (tick * 360) / 4096;
 end
 
