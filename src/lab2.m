@@ -102,8 +102,7 @@ try
       
       switch current_move
           case 1
-            % qf = a0 + a1*t_final + a2*(t_final^2) + a3(t_final^3)
-            move1_packet(1) = 0; %get qf for base
+            move1_packet(1) = 0;
             move1_packet(4) = elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3); %get qf for elbow
             move1_packet(7) = wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3); %get qf for wrist
             
