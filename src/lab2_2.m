@@ -58,9 +58,8 @@ try
   move4_packet = zeros(15, 1, 'single');
   move5_packet = zeros(15, 1, 'single');
   
-  move1_goal = [0 100 -300];
-  move2_goal = [0 300 300];
-  move3_goal = [0 600 -300];
+  move1_goal = [220 220 220];
+  move2_goal = [-220 -220 -220];
   
   % The following code generates a sinusoidal trajectory to be
   % executed on joint 1 of the arm and iteratively sends the list of
@@ -81,7 +80,6 @@ try
   
   move1_packet(1) = move1_goal(1);
   move1_packet(4) = move1_goal(2);
-  move1_packet(7) = move1_goal(3);
   
   pp.write(MOVE_SERV_ID, move1_packet); 
 
@@ -102,43 +100,27 @@ try
       
       switch current_move
           case 1
-            move1_packet(1) = 0;
-            move1_packet(4) = elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3); %get qf for elbow
-            move1_packet(7) = wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3); %get qf for wrist
+            move_target = ikin(move1_goal);
+            move1_packet(1) = angleToTicks(move_target(1));
+            move1_packet(4) = angleToTicks(move_target(2));
+            move1_packet(7) = angleToTicks(move_target(3));
             
             pp.write(MOVE_SERV_ID, move1_packet); 
             if (returnPacket(1) < move1_goal(1)+position_tolerance && returnPacket(1) > move1_goal(1)-position_tolerance) && (returnPacket(2) < move1_goal(2)+position_tolerance && returnPacket(2) > move1_goal(2)-position_tolerance) && (returnPacket(3) < move1_goal(3)+position_tolerance && returnPacket(3) > move1_goal(3)-position_tolerance) 
-                pause(0.5)
-                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_goal(2), move2_goal(2));
-                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_goal(3), move2_goal(3));
-  
+                pause(3)
                 current_move = 2;
             end
           case 2
-            move2_packet(1) = 0; %get qf for base
-            move2_packet(4) = elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3); %get qf for elbow
-            move2_packet(7) = wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3); %get qf for wrist
+            move_target = ikin(move2_goal);
+            move2_packet(1) = angleToTicks(move_target(1));
+            move2_packet(4) = angleToTicks(move_target(2));
+            move2_packet(7) = angleToTicks(move_target(3));
             
             pp.write(MOVE_SERV_ID, move2_packet); 
             if (returnPacket(1) < move2_goal(1)+position_tolerance && returnPacket(1) > move2_goal(1)-position_tolerance) && (returnPacket(2) < move2_goal(2)+position_tolerance && returnPacket(2) > move2_goal(2)-position_tolerance) && (returnPacket(3) < move2_goal(3)+position_tolerance && returnPacket(3) > move2_goal(3)-position_tolerance) 
-               pause(0.5);
-               elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move2_goal(2), move3_goal(2));
-               wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move2_goal(3), move3_goal(3));
-               
-               current_move = 3;
-            end
-          case 3
-            move3_packet(1) = 0; %get qf for base
-            move3_packet(4) = elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3); %get qf for elbow
-            move3_packet(7) = wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3); %get qf for wrist
-            
-            pp.write(MOVE_SERV_ID, move3_packet); 
-            if (returnPacket(1) < move3_goal(1)+position_tolerance && returnPacket(1) > move3_goal(1)-position_tolerance) && (returnPacket(2) < move3_goal(2)+position_tolerance && returnPacket(2) > move3_goal(2)-position_tolerance) && (returnPacket(3) < move3_goal(3)+position_tolerance && returnPacket(3) > move3_goal(3)-position_tolerance) 
-               pause(0.5);
-               elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move3_goal(2), move1_goal(2));
-               wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move3_goal(3), move1_goal(3));
+               pause(3);
                current_move = 1;
-           end
+            end
       end
       
       figure(1)
@@ -167,7 +149,8 @@ try
           packet((x*3)+3)=0;
       end
       toc
-      
+        
+      csvwrite('EFData.csv', fwkinEF);
       % pause(0.1)
   end 
   
