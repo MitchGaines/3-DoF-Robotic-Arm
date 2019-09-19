@@ -29,7 +29,7 @@ try
   PID_CONFIG_SERV_ID = 02;
   STATUS_SERV_ID = 03; 
 
-  DEBUG   = true;          % enables/disables debug prints
+  DEBUG   = false;          % enables/disables debug prints
 
   figure(1)
   xlabel('Elapsed Time (sec)');
@@ -49,22 +49,30 @@ try
   
   % packet sizes up to 64 bytes.
   current_move = 1;
-  position_tolerance = 20;
+  joint_tolerance = 5;
   step = 0.0005;
-  total_move_step = 5;
+  total_move_step = 7;
   move1_packet = zeros(15, 1, 'single');
   move2_packet = zeros(15, 1, 'single');
   move3_packet = zeros(15, 1, 'single');
   move4_packet = zeros(15, 1, 'single');
   move5_packet = zeros(15, 1, 'single');
   
-  move1_goal = [220 220 220];
-  move2_goal = [-220 -220 -220];
+  move1_pos_goal = [175 -200 0];
+  move2_pos_goal = [175 200 0];
+  move3_pos_goal = [100 200 400];
+  move4_pos_goal = [175 0 700];
+  move5_pos_goal = [100 -200 400];
+  
+  move1_joint_goal = ikin(move1_pos_goal); % this specifies the target joint angles
+  move2_joint_goal = ikin(move2_pos_goal); % this specifies the target joint angles
+  move3_joint_goal = ikin(move3_pos_goal);
+  move4_joint_goal = ikin(move4_pos_goal);
+  move5_joint_goal = ikin(move5_pos_goal);
   
   % The following code generates a sinusoidal trajectory to be
   % executed on joint 1 of the arm and iteratively sends the list of
   % setpoints to the Nucleo firmware. 
-  posData = [];
   tic
   actualPosition = 0;
   pid_config_packet(1) = 0.00295; % base kp
@@ -78,14 +86,17 @@ try
   pid_config_packet(9) = 0.00002; % wrist kd
   pp.write(PID_CONFIG_SERV_ID, pid_config_packet);
   
-  move1_packet(1) = move1_goal(1);
-  move1_packet(4) = move1_goal(2);
+  move1_packet(1) = angleToTicks(move1_joint_goal(1));
+  move1_packet(4) = angleToTicks(move1_joint_goal(2));
+  move1_packet(7) = angleToTicks(move1_joint_goal(3));
   
   pp.write(MOVE_SERV_ID, move1_packet); 
 
-  elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_goal(2), move2_goal(2));
-  wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_goal(3), move2_goal(3));
-  
+  current_move = 2; % since we just went to our first position, lets calculate to go from 1->2 and immediately step into move 2
+  base_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(1), move2_joint_goal(1));
+  elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(2), move2_joint_goal(2));
+  wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(3), move2_joint_goal(3));
+
   while true
       packet = zeros(15, 1, 'single');
       pp.write(STATUS_SERV_ID, packet);
@@ -93,32 +104,88 @@ try
       pause(0.003); % Minimum amount of time required between write and read
 
       returnPacket = pp.read(STATUS_SERV_ID);
-      actualPosition = returnPacket(1);
-      posData = [posData ; returnPacket(1) returnPacket(2) returnPacket(3)];
-      
+            
       jointAngles = [ticksToAngle(returnPacket(1)) ticksToAngle(returnPacket(2)) ticksToAngle(returnPacket(3))];
       
       switch current_move
           case 1
-            move_target = ikin(move1_goal);
-            move1_packet(1) = angleToTicks(move_target(1));
-            move1_packet(4) = angleToTicks(move_target(2));
-            move1_packet(7) = angleToTicks(move_target(3));
+            move1_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+            move1_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+            move1_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
             
             pp.write(MOVE_SERV_ID, move1_packet); 
-            if (returnPacket(1) < move1_goal(1)+position_tolerance && returnPacket(1) > move1_goal(1)-position_tolerance) && (returnPacket(2) < move1_goal(2)+position_tolerance && returnPacket(2) > move1_goal(2)-position_tolerance) && (returnPacket(3) < move1_goal(3)+position_tolerance && returnPacket(3) > move1_goal(3)-position_tolerance) 
-                pause(3)
-                current_move = 2;
+
+            if (jointAngles(1) < move1_joint_goal(1)+joint_tolerance && jointAngles(1) > move1_joint_goal(1)-joint_tolerance) &&  (jointAngles(2) < move1_joint_goal(2)+joint_tolerance && jointAngles(2) > move1_joint_goal(2)-joint_tolerance) && (jointAngles(3) < move1_joint_goal(3)+joint_tolerance && jointAngles(3) > move1_joint_goal(3)-joint_tolerance)
+               base_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(1), move2_joint_goal(1));
+               elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(2), move2_joint_goal(2));
+               wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(3), move2_joint_goal(3));
+               
+               pause(1);
+               current_move = 2;
             end
-          case 2
-            move_target = ikin(move2_goal);
-            move2_packet(1) = angleToTicks(move_target(1));
-            move2_packet(4) = angleToTicks(move_target(2));
-            move2_packet(7) = angleToTicks(move_target(3));
+
+          case 2  
+            calculated_points = [];
+            calculated_points(1) = base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3);
+            move2_packet(1) = angleToTicks(calculated_points(1));
+            calculated_points(2) = elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3);
+            move2_packet(4) = angleToTicks(calculated_points(2));
+            calculated_points(3) = wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3);
+            move2_packet(7) = angleToTicks(calculated_points(3));
             
             pp.write(MOVE_SERV_ID, move2_packet); 
-            if (returnPacket(1) < move2_goal(1)+position_tolerance && returnPacket(1) > move2_goal(1)-position_tolerance) && (returnPacket(2) < move2_goal(2)+position_tolerance && returnPacket(2) > move2_goal(2)-position_tolerance) && (returnPacket(3) < move2_goal(3)+position_tolerance && returnPacket(3) > move2_goal(3)-position_tolerance) 
-               pause(3);
+            
+            if (jointAngles(1) < move2_joint_goal(1)+joint_tolerance && jointAngles(1) > move2_joint_goal(1)-joint_tolerance) &&  (jointAngles(2) < move2_joint_goal(2)+joint_tolerance && jointAngles(2) > move2_joint_goal(2)-joint_tolerance) && (jointAngles(3) < move2_joint_goal(3)+joint_tolerance && jointAngles(3) > move2_joint_goal(3)-joint_tolerance)
+               base_coef = trajectory(toc, toc+total_move_step, 0, 0, move2_joint_goal(1), move3_joint_goal(1));
+               elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move2_joint_goal(2), move3_joint_goal(2));
+               wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move2_joint_goal(3), move3_joint_goal(3));
+               
+               pause(1);
+               current_move = 3;
+            end
+          case 3  
+            move3_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+            move3_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+            move3_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+            
+            pp.write(MOVE_SERV_ID, move3_packet); 
+            
+            if (jointAngles(1) < move3_joint_goal(1)+joint_tolerance && jointAngles(1) > move3_joint_goal(1)-joint_tolerance) &&  (jointAngles(2) < move3_joint_goal(2)+joint_tolerance && jointAngles(2) > move3_joint_goal(2)-joint_tolerance) && (jointAngles(3) < move3_joint_goal(3)+joint_tolerance && jointAngles(3) > move3_joint_goal(3)-joint_tolerance)
+               base_coef = trajectory(toc, toc+total_move_step, 0, 0, move3_joint_goal(1), move4_joint_goal(1));
+               elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move3_joint_goal(2), move4_joint_goal(2));
+               wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move3_joint_goal(3), move4_joint_goal(3));
+               
+               pause(1);
+               current_move = 4;
+            end
+         case 4
+            move4_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+            move4_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+            move4_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+            
+            pp.write(MOVE_SERV_ID, move4_packet); 
+            
+            if (jointAngles(1) < move4_joint_goal(1)+joint_tolerance && jointAngles(1) > move4_joint_goal(1)-joint_tolerance) &&  (jointAngles(2) < move4_joint_goal(2)+joint_tolerance && jointAngles(2) > move4_joint_goal(2)-joint_tolerance) && (jointAngles(3) < move4_joint_goal(3)+joint_tolerance && jointAngles(3) > move4_joint_goal(3)-joint_tolerance)
+               base_coef = trajectory(toc, toc+total_move_step, 0, 0, move4_joint_goal(1), move5_joint_goal(1));
+               elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move4_joint_goal(2), move5_joint_goal(2));
+               wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move4_joint_goal(3), move5_joint_goal(3));
+               
+               pause(1);
+               current_move = 5;
+            end
+         case 5
+            move5_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+            move5_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+            move5_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+            
+            pp.write(MOVE_SERV_ID, move5_packet); 
+            
+            if (jointAngles(1) < move5_joint_goal(1)+joint_tolerance && jointAngles(1) > move5_joint_goal(1)-joint_tolerance) &&  (jointAngles(2) < move5_joint_goal(2)+joint_tolerance && jointAngles(2) > move5_joint_goal(2)-joint_tolerance) && (jointAngles(3) < move5_joint_goal(3)+joint_tolerance && jointAngles(3) > move5_joint_goal(3)-joint_tolerance)
+               base_coef = trajectory(toc, toc+total_move_step, 0, 0, move5_joint_goal(1), move1_joint_goal(1));
+               elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move5_joint_goal(2), move1_joint_goal(2));
+               wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, move5_joint_goal(3), move1_joint_goal(3));
+               
+               pause(1);
                current_move = 1;
             end
       end
@@ -129,12 +196,12 @@ try
       addpoints(line2, toc, double(jointAngles(2)))
       addpoints(line3, toc, double(jointAngles(3)))
       
-      figure(2)
-      plotArm(jointAngles);
-      
-      figure(3)
-      fwkinEF = fwkin3001(jointAngles);
-      addpoints(line4, double(fwkinEF(1)), double(fwkinEF(3)))
+%       figure(2)
+%       plotArm(jointAngles);
+%       
+%       figure(3)
+%       fwkinEF = fwkin3001(jointAngles);
+%       addpoints(line4, double(fwkinEF(1)), double(fwkinEF(3)))
       
       if DEBUG
           disp('Sent Packet:');
@@ -150,7 +217,7 @@ try
       end
       toc
         
-      csvwrite('EFData.csv', fwkinEF);
+      % csvwrite('EFData.csv', fwkinEF);
       % pause(0.1)
   end 
   
