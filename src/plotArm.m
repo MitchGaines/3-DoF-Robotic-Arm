@@ -8,7 +8,7 @@ function plotArm(q, ef_vel)
     fwkin3 = [T012(1,4) T012(2,4) T012(3,4)];
     fwkinEF = fwkin3001(q);
     
-    plot3([0, fwkin2(1), fwkin3(1), fwkinEF(1), ef_vel(1)], [0, fwkin2(2), fwkin3(2), fwkinEF(2), ef_vel(2)], [0, fwkin2(3), fwkin3(3), fwkinEF(3), ef_vel(3)]);
+    plot3([0, fwkin2(1), fwkin3(1), fwkinEF(1)], [0, fwkin2(2), fwkin3(2), fwkinEF(2)], [0, fwkin2(3), fwkin3(3), fwkinEF(3)]);
     xlim([-0.5 0.5])
     ylim([-0.5 0.5])
     zlim([-0.5 0.5])

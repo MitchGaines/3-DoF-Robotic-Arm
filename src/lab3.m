@@ -89,6 +89,15 @@ try
       ef_velocity = fwkinJcb(jointAngles, velocity);
       
       plotArm(jointAngles, ef_velocity);
+      J = jacob0(jointAngles);
+      
+      Jvd = det(J(1:3, : ))
+      
+       if -.0002 < Jvd && Jvd < .0002
+         text(0,0,0,'Singularity!','HorizontalAlignment','left','FontSize',8);
+         error("Singularity hit. Program terminating.")
+         break;
+       end
       
       switch current_move
           case 1
@@ -101,7 +110,8 @@ try
             move_return = pp.read(MOVE_SERV_ID);
       
             velocity = [ticksToAngle(move_return(2)); ticksToAngle(move_return(5)); ticksToAngle(move_return(8))];
-                        
+            
+            
             if (jointAngles(1) < move1_joint_goal(1)+joint_tolerance && jointAngles(1) > move1_joint_goal(1)-joint_tolerance) &&  (jointAngles(2) < move1_joint_goal(2)+joint_tolerance && jointAngles(2) > move1_joint_goal(2)-joint_tolerance) && (jointAngles(3) < move1_joint_goal(3)+joint_tolerance && jointAngles(3) > move1_joint_goal(3)-joint_tolerance)
                base_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(1), move2_joint_goal(1));
                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, move1_joint_goal(2), move2_joint_goal(2));
