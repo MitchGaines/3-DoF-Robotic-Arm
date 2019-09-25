@@ -95,7 +95,7 @@ try
       
        if -.0002 < Jvd && Jvd < .0002
          text(0,0,0,'Singularity!','HorizontalAlignment','left','FontSize',8);
-         error("Singularity hit. Program terminating.")
+         error('Singularity hit. Program terminating.')
          break;
        end
       
