@@ -27,7 +27,7 @@ function J = jacob0(q)
   JW(3,3) = T0_2(3,3);
   
   J = [JV;JW];
-
+  Jvd = det(JV) 
  
 
 end
