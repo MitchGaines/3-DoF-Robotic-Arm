@@ -14,8 +14,8 @@ function J = jacob0(q)
  
  JV = double(vpa(JV, 4));
  
- T0_1 = tdh(-q(1), 0.135, 0, -90);
- T0_2 = tdh(-q(1), 0.135, 0, -90) * tdh(-q(2), 0, 0.175, 0);
+ T0_1 = tdhr(-q(1), 0.135, 0, -90);
+ T0_2 = tdhr(-q(1), 0.135, 0, -90) * tdhr(-q(2), 0, 0.175, 0);
   
  % z0
  JW(1,1) = 0;
@@ -30,9 +30,7 @@ function J = jacob0(q)
  JW(2,3) = T0_2(2,3);
  JW(3,3) = T0_2(3,3);
   
- J = [JV;JW];
- Jvd = det(JV) 
- 
+ J = [JV;JW]; 
 
 end
 
