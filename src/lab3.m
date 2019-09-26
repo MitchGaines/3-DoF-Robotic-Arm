@@ -91,7 +91,7 @@ try
       plotArm(jointAngles, ef_velocity);
       J = jacob0(jointAngles);
       
-      Jvd = det(J(1:3, : ))
+      Jvd = det(J(1:3, : ));
       
        if -.0002 < Jvd && Jvd < .0002
          text(0,0,0,'Singularity!','HorizontalAlignment','left','FontSize',8);
