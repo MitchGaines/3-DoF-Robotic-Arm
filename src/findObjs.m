@@ -51,14 +51,20 @@ function [imDetectedDisk, robotFramePose, diskDia] = findObjs(imOrig, T_checker_
 
 %%  2. Segment the image to find the objects of interest.
 
-%  [Your image processing code goes here]
+blured_image = imguassfilt(im, 2);
+
+green_mask = createGreenMask(blured_image);
+yellow_mask = createYellowMask(blured_image);
+blue_mask = createBlueMask(blured_image);
+
+
 
 % You can easily convert image pixel coordinates to 3D coordinates (expressed in the
 % checkerboard reference frame) using the following transformations:
 
 R = T_cam_to_checker(1:3,1:3);
 t = T_cam_to_checker(1:3,4);
-% worldPoints = pointsToWorld(cameraParams, R, t, YOUR_PIXEL_VALUES);
+worldPoints = pointsToWorld(cameraParams, R, t, YOUR_PIXEL_VALUES);
 
 % see https://www.mathworks.com/help/vision/ref/cameraparameters.pointstoworld.html
 % for details on the expected dimensions for YOUR_PIXEL_VALUES)
