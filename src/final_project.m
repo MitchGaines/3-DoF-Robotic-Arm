@@ -48,6 +48,30 @@ try
   pid_config_packet(9) = 0.00002; % wrist kd
   pp.write(PID_CONFIG_SERV_ID, pid_config_packet);
   
+  joint_tolerance = 5;
+  position_tolerance = 3;
+  step = 0.0005;
+  total_move_step = 7;
+  
+  rapid_packet = zeros(15, 1, 'single');
+  left_packet = zeros(15, 1, 'single');
+  right_packet = zeros(15, 1, 'single');
+  
+  rapid_pos_goal = [125 0 400];
+  left_pos_goal = [150 -200 0];
+  right_pos_goal = [150 200 0];
+  
+  rapid_joint_goal = ikin(rapid_pos_goal);
+  left_joint_goal = ikin(left_pos_goal); 
+  right_joint_goal = ikin(right_pos_goal);
+  
+  rapid_packet(1) = angleToTicks(rapid_joint_goal(1));
+  rapid_packet(4) = angleToTicks(rapid_joint_goal(2));
+  rapid_packet(7) = angleToTicks(rapid_joint_goal(3));
+  
+  pp.write(MOVE_SERV_ID, rapid_packet);
+  previous_ball_locations = [];
+  
   while true
       current_image = snapshot(cam);
       packet = zeros(15, 1, 'single');
@@ -55,7 +79,17 @@ try
       pause(0.003);
       returnPacket = pp.read(STATUS_SERV_ID); % gets current position data
       
-      ball_locations = findObjs(current_image, T_cam_to_checker, cameraParams);
+      [green_loc, blue_loc, yellow_loc] = findObjs(current_image, T_cam_to_checker, cameraParams);
+      % BALL LOCATIONS ALWAYS USES GREEN BLUE YELLOW AS ITS ORDER
+      ball_locations = [green_loc; blue_loc; yellow_loc];
+      ball_locations = getCheckerboardToRobot(ball_locations);
+      
+      % if my target has changed by some meaningful amount, update the
+      % trajectory coefs and decrease total step time by .5 seconds
+      if outsideOfTolerances(previous_ball_locations, ball_locations)
+          disp('target moved');
+      end
+      
       
       if DEBUG
           disp('Sent Packet:');
@@ -63,6 +97,8 @@ try
           disp('Received Packet:');
           disp(returnPacket);
       end
+      
+      previous_ball_locations = ball_locations;
   end 
   
 catch exception

@@ -103,7 +103,7 @@ worldPoints1 = pointsToWorld(cameraParams, R, t, imagePoints1);
 
 d = worldPoints1(2, :) - worldPoints1(1, :);
 diameterInMillimeters = hypot(d(1), d(2));
-green_world_location = pointsToWorld(cameraParams, R, t, [(green_boxes(1)+green_boxes(3)/2) (green_boxes(2)+green_boxes(4)/2)])
+green_world_location = pointsToWorld(cameraParams, R, t, [(green_boxes(1)+green_boxes(3)/2) (green_boxes(2)+green_boxes(4)/2)]);
 % fprintf('Measured diameter of one green ball = %0.2f mm\n', diameterInMillimeters);
 
 blue_box1 = double(blue_boxes(1, :));
@@ -114,7 +114,7 @@ worldPoints1 = pointsToWorld(cameraParams, R, t, imagePoints1);
 
 d = worldPoints1(2, :) - worldPoints1(1, :);
 diameterInMillimeters = hypot(d(1), d(2));
-blue_world_location = pointsToWorld(cameraParams, R, t, [(blue_boxes(1)+blue_boxes(3)/2) (blue_boxes(2)+blue_boxes(4)/2)])
+blue_world_location = pointsToWorld(cameraParams, R, t, [(blue_boxes(1)+blue_boxes(3)/2) (blue_boxes(2)+blue_boxes(4)/2)]);
 % fprintf('Measured diameter of one blue ball = %0.2f mm\n', diameterInMillimeters);
 
 yellow_box1 = double(yellow_boxes(1, :));
@@ -125,7 +125,7 @@ worldPoints1 = pointsToWorld(cameraParams, R, t, imagePoints1);
 
 d = worldPoints1(2, :) - worldPoints1(1, :);
 diameterInMillimeters = hypot(d(1), d(2));
-yellow_world_location = pointsToWorld(cameraParams, R, t, [(yellow_boxes(1)+yellow_boxes(3)/2) (yellow_boxes(2)+yellow_boxes(4)/2)])
+yellow_world_location = pointsToWorld(cameraParams, R, t, [(yellow_boxes(1)+yellow_boxes(3)/2) (yellow_boxes(2)+yellow_boxes(4)/2)]);
 % fprintf('Measured diameter of one yellow ball = %0.2f mm\n', diameterInMillimeters);
 
 % see https://www.mathworks.com/help/vision/ref/cameraparameters.pointstoworld.html
