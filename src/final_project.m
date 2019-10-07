@@ -37,6 +37,7 @@ try
 
   tic
   actualPosition = 0;
+  holding_ball = 0;
   pid_config_packet(1) = 0.00295; % base kp
   pid_config_packet(2) = 0.00010; % base ki
   pid_config_packet(3) = 0.00002; % base kd
@@ -50,8 +51,8 @@ try
   
   joint_tolerance = 5;
   position_tolerance = 3;
-  step = 0.001;
-  total_move_step = 7;
+  step = 0.0015;
+  total_move_step = 8;
   
   rapid_packet = zeros(15, 1, 'single');
   left_packet = zeros(15, 1, 'single');
@@ -72,6 +73,8 @@ try
   pp.write(MOVE_SERV_ID, rapid_packet);
   previous_ball_locations = zeros(3, 2, 'single');
   
+  armcontrol = 'Grn';
+  
   while true
       current_image = snapshot(cam);
       packet = zeros(15, 1, 'single');
@@ -84,27 +87,123 @@ try
       ball_locations = [green_loc; blue_loc; yellow_loc];
       ball_locations = getCheckerboardToRobot(ball_locations);
       
+      green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) 0]);
+      blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) 0]);
+      yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) 0]);
       
-      % if my target has changed by some meaningful amount, update the
-      % trajectory coefs and decrease total step time by .5 seconds
-      if outsideOfTolerances(previous_ball_locations, ball_locations)
-        disp('Recalculating coefficients. . . ');
-        green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) 0]);
-        blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) 0]);
-        yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) 0]);
-        
-        base_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, ticksToAngle(returnPacket(1)), green_goal(1));
-        elbow_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, ticksToAngle(returnPacket(2)), green_goal(2));
-        wrist_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, ticksToAngle(returnPacket(3)), green_goal(3));
-      else
-          move1_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
-          move1_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
-          move1_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+      jointAngles = [ticksToAngle(returnPacket(1)) ticksToAngle(returnPacket(2)) ticksToAngle(returnPacket(3))];
+      
+%       if -.0002 < Jvd && Jvd < .0002
+%          text(0,0,0,'Singularity!','HorizontalAlignment','left','FontSize',8);
+%          error('Singularity hit. Program terminating.')
+%          break;
+%       end
+      
+      switch armcontrol
           
-          pp.write(MOVE_SERV_ID, move1_packet);
-          
+          case 'Grn'
+            
+            if outsideOfTolerances(previous_ball_locations(1,:), ball_locations(1,:))
+                disp('Recalculating coefficients. . . ');
+                green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) -5]);
+            
+                % add logic in here to determine which goal to go to
+                base_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(1), green_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(2), green_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(3), green_goal(3));
+            
+            else
+                move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+                move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+                move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+
+                pp.write(MOVE_SERV_ID, move_packet);
+            end
+            
+            if atLocation(jointAngles, green_goal) 
+                armcontrol = 'Grip';
+                color_it = 'Blu';
+            end 
+            
+          case 'Blu'
+            if outsideOfTolerances(previous_ball_locations(2,:), ball_locations(2,:))
+                disp('Recalculating coefficients. . . ');
+                blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) -5]);
+            
+                % add logic in here to determine which goal to go to
+                base_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(1), blue_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(2), blue_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(3), blue_goal(3));
+            
+            else
+                move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+                move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+                move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+
+                pp.write(MOVE_SERV_ID, move_packet);
+            end
+            
+            if atLocation(jointAngles, blue_goal) 
+                armcontrol = 'Grip';
+                color_it = 'Ylw';
+            end 
+
+          case 'Ylw'
+            if outsideOfTolerances(previous_ball_locations(3,:), ball_locations(3,:))
+                disp('Recalculating coefficients. . . ');
+                yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) -5]);
+            
+                % add logic in here to determine which goal to go to
+                base_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(1), yellow_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(2), yellow_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(3), yellow_goal(3));
+            
+            else
+                move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+                move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+                move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+
+                pp.write(MOVE_SERV_ID, move_packet);
+            end
+            
+            if atLocation(jointAngles, yellow_goal) 
+                armcontrol = 'Grip';
+                color_it = 'Done';
+            end 
+            
+          case 'Grip'
+              closeGrip = true;
+              armcontrol = 'Rapid';
+              
+              base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
+              elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), rapid_joint_goal(2));
+              wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), rapid_joint_goal(3));
+              
+          case 'Rapid'
+              move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+              move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+              move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+
+              pp.write(MOVE_SERV_ID, move_packet);
+              
+              if atLocation(jointAngles, rapid_joint_goal)
+                  armcontrol = 'Sort';
+                  base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_joint_goal(1));
+                  elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_joint_goal(2));
+                  wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_joint_goal(3));
+              end
+                
+          case 'Sort' 
+            move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+            move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+            move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+
+            pp.write(MOVE_SERV_ID, move_packet);
+            
+            if atLocation(jointAngles, left_joint_goal)
+                armcontrol = color_it;
+            end  
       end
-      
       
       if DEBUG
           disp('Sent Packet:');
