@@ -22,16 +22,17 @@ myHIDSimplePacketComs.connect();
 
 cam = webcam();
 LoadCalibrationImages();
-pause(1);
+pause(.5);
 T_cam_to_checker = getCamToCheckerboard(cam, cameraParams);
 disp('REMOVE CHECKERBOARD');
-pause(3);
+pause(.5);
 % Create a PacketProcessor object to send data to the nucleo firmware
 pp = PacketProcessor(myHIDSimplePacketComs); 
 try
   MOVE_SERV_ID = 01;
   PID_CONFIG_SERV_ID = 02;
-  STATUS_SERV_ID = 03; 
+  STATUS_SERV_ID = 03;
+  GRIPPER_SERVER_ID = 05;
 
   DEBUG   = false;          % enables/disables debug prints
 
@@ -48,21 +49,22 @@ try
   pid_config_packet(8) = 0.00007; % wrist ki
   pid_config_packet(9) = 0.00002; % wrist kd
   pp.write(PID_CONFIG_SERV_ID, pid_config_packet);
+  pp.write(GRIPPER_SERVER_ID, [2 0 0]);
   
   joint_tolerance = 5;
   position_tolerance = 3;
 %   step = 0.01;
 %   total_move_step = 19;
-  step = 0.005;
+  step = 0.004;
   total_move_step = 10;
   
   rapid_packet = zeros(15, 1, 'single');
   left_packet = zeros(15, 1, 'single');
   right_packet = zeros(15, 1, 'single');
   
-  rapid_pos_goal = [150 0 300];
-  left_pos_goal = [210 250 0];
-  right_pos_goal = [210 -250 0];
+  rapid_pos_goal = [200 0 100];
+  left_pos_goal = [0 210 0];
+  right_pos_goal = [0 -210 0];
   
   rapid_joint_goal = ikin(rapid_pos_goal);
   left_joint_goal = ikin(left_pos_goal); 
@@ -100,15 +102,26 @@ try
       tmp = [green_loc; blue_loc; yellow_loc];
       [green_loc, blue_loc, yellow_loc] = findObjs(current_image, T_cam_to_checker, cameraParams);
       % BALL LOCATIONS ALWAYS USES GREEN BLUE YELLOW AS ITS ORDER
-      if(green_loc == [-484.0018, 523.4003])
+      
+      if(~outsideOfTolerances(green_loc, [-478, 528], 40) && strcmp(armcontrol, 'Grn'))
+        % my green location within the tolerances of the arbitrary not
+        % shown location? If so, just keep it as my last known green
+        % coordinate
         green_loc = tmp(1,:);
       end 
-      if(blue_loc == [-484.0018, 523.4003])
+      if(~outsideOfTolerances(blue_loc, [-478, 528], 40) && strcmp(armcontrol, 'Blu'))
+        % my blue location within the tolerances of the arbitrary not
+        % shown location? If so, just keep it as my last known blue
+        % coordinate
         blue_loc = tmp(2,:);
       end 
-      if(yellow_loc == [-484.0018, 523.4003])
+      if(~outsideOfTolerances(yellow_loc, [-478, 528], 40) && strcmp(armcontrol, 'Ylw'))
+        % my yellow location within the tolerances of the arbitrary not
+        % shown location? If so, just keep it as my last known yellow
+        % coordinate
         yellow_loc = tmp(3,:);
       end 
+      
       ball_locations = [green_loc; blue_loc; yellow_loc];
       ball_locations = getCheckerboardToRobot(ball_locations);
       
@@ -116,17 +129,16 @@ try
       blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) -20]);
       yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) -20]);
       
-      
       switch armcontrol
           
           case 'Grn'
-            if outsideOfTolerances(previous_ball_locations(1,:), ball_locations(1,:))
+            if outsideOfTolerances(previous_ball_locations(1,:), ball_locations(1,:), 5)
                 disp('Recalculating coefficients. . . ');
                 green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) -20]);
             
-                base_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(1), green_goal(1));
-                elbow_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(2), green_goal(2));
-                wrist_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(3), green_goal(3));
+                base_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(1), green_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(2), green_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(3), green_goal(3));
             
             else
                 move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
@@ -143,13 +155,13 @@ try
             end 
             
           case 'Blu'
-            if outsideOfTolerances(previous_ball_locations(2,:), ball_locations(2,:))
+            if outsideOfTolerances(previous_ball_locations(2,:), ball_locations(2,:), 5)
                 disp('Recalculating coefficients. . . ');
                 blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) -20]);
             
-                base_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(1), blue_goal(1));
-                elbow_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(2), blue_goal(2));
-                wrist_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(3), blue_goal(3));
+                base_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(1), blue_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(2), blue_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(3), blue_goal(3));
             
             else
                 move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
@@ -166,13 +178,13 @@ try
             end 
 
           case 'Ylw'
-            if outsideOfTolerances(previous_ball_locations(3,:), ball_locations(3,:))
+            if outsideOfTolerances(previous_ball_locations(3,:), ball_locations(3,:), 5)
                 disp('Recalculating coefficients. . . ');
                 yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) -20]);
             
-                base_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(1), yellow_goal(1));
-                elbow_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(2), yellow_goal(2));
-                wrist_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(3), yellow_goal(3));
+                base_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(1), yellow_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(2), yellow_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(3), yellow_goal(3));
             
             else
                 move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
@@ -193,6 +205,7 @@ try
               armcontrol = 'Rapid';
               grip_step = 1;
               
+              pp.write(GRIPPER_SERVER_ID, [1 0 0]);
               pause(1);
 
               base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
@@ -240,8 +253,13 @@ try
             
             if atLocation(jointAngles, left_joint_goal) || atLocation(jointAngles, right_joint_goal)
                 holding_ball = 0;
+                pp.write(GRIPPER_SERVER_ID, [2 0 0]);
                 armcontrol = 'Rapid';
                 color_hold = '';
+                
+                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), rapid_joint_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), rapid_joint_goal(3));
             end  
       end
       
