@@ -63,8 +63,8 @@ try
   right_packet = zeros(15, 1, 'single');
   
   rapid_pos_goal = [200 0 100];
-  left_pos_goal = [0 250 0];
-  right_pos_goal = [0 -250 0];
+  left_pos_goal = [0 300 0];
+  right_pos_goal = [0 -300 0];
   
   rapid_joint_goal = ikin(rapid_pos_goal);
   left_joint_goal = ikin(left_pos_goal); 
@@ -293,23 +293,42 @@ try
                   disp ("Pursuing Classify");
                   cropped_image = imcrop(current_image, 'logical', [186 101 234 200]);
                   [diskCenter, diskRadius] = imfindcircles(cropped_image,[diskMin diskMax],'ObjectPolarity', 'dark', 'Sensitivity',0.95, 'EdgeThreshold', .1);
-                  disp("Center");
-                  disp(diskCenter);
-                  disp("Radius");              
-                  disp(diskRadius); 
-                  if(diskRadius >= 75)
-                      diskSize = 1;
-                      armcontrol = 'SortBig';
-                      base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_joint_goal(1));
-                      elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_joint_goal(2));
-                      wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_joint_goal(3));
+                  if isempty(diskRadius)
+                      armcontrol = color_hold;
+                      pp.write(GRIPPER_SERVER_ID, [2 0 0]);
+                      switch color_hold
+                        case 'Grn'
+                            base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), green_goal(1));
+                            elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), green_goal(2));
+                            wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), green_goal(3));
+                        case 'Blu'
+                            base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), blue_goal(1));
+                            elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), blue_goal(2));
+                            wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), blue_goal(3));
+                        case 'Ylw'
+                            base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), yellow_goal(1));
+                            elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), yellow_goal(2));
+                            wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), yellow_goal(3));
+                        end
                   else
-                      diskSize = 0;
-                      armcontrol = 'SortSmall';
-                      base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), right_joint_goal(1));
-                      elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), right_joint_goal(2));
-                      wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), right_joint_goal(3));
-                  end
+                      disp("Center");
+                      disp(diskCenter);
+                      disp("Radius");              
+                      disp(diskRadius); 
+                      if(diskRadius >= 75)
+                          diskSize = 1;
+                          armcontrol = 'SortBig';
+                          base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_joint_goal(1));
+                          elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_joint_goal(2));
+                          wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_joint_goal(3));
+                      else
+                          diskSize = 0;
+                          armcontrol = 'SortSmall';
+                          base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), right_joint_goal(1));
+                          elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), right_joint_goal(2));
+                          wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), right_joint_goal(3));
+                      end
+                  end 
               end
          
           case 'SortBig' 
