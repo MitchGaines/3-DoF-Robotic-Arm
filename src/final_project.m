@@ -91,6 +91,13 @@ try
   blue_loc = [0, 0];
   arc_goal = [0, 0];
   
+  %Disk size calculation variables
+  diskMin = 50;
+  diskMax = 150;
+  diskCenter = [0, 0];
+  diskRadius = 0;
+  diskSize = 0; % 0 -> small disk, 1 -> large disk
+  
   while true
       current_image = snapshot(cam);
       packet = zeros(15, 1, 'single');
@@ -244,10 +251,8 @@ try
               
               if atLocation(jointAngles, rapid_joint_goal)
                   if holding_ball
-                    armcontrol = 'Sort';
-                    base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_joint_goal(1));
-                    elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_joint_goal(2));
-                    wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_joint_goal(3));
+                    armcontrol = 'Classify';
+                    
                   else
                       
                     if strcmp(color_it, 'Grn') && ~outsideOfTolerances(green_loc, [-478, 528], 40)
@@ -278,10 +283,37 @@ try
                             wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), yellow_goal(3));
                     end
                   end
+                  delay = 0;
               end
-                
-          case 'Sort' 
-            disp("Pursuing Sort");
+              
+          case 'Classify'
+              if delay == 0
+                  delay = 1;
+              elseif delay == 1                  
+                  disp ("Pursuing Classify");
+                  cropped_image = imcrop(current_image, 'logical', [186 101 234 200]);
+                  [diskCenter, diskRadius] = imfindcircles(cropped_image,[diskMin diskMax],'ObjectPolarity', 'dark', 'Sensitivity',0.95, 'EdgeThreshold', .1);
+                  disp("Center");
+                  disp(diskCenter);
+                  disp("Radius");              
+                  disp(diskRadius); 
+                  if(diskRadius >= 75)
+                      diskSize = 1;
+                      armcontrol = 'SortBig';
+                      base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_joint_goal(1));
+                      elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_joint_goal(2));
+                      wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_joint_goal(3));
+                  else
+                      diskSize = 0;
+                      armcontrol = 'SortSmall';
+                      base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), right_joint_goal(1));
+                      elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), right_joint_goal(2));
+                      wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), right_joint_goal(3));
+                  end
+              end
+         
+          case 'SortBig' 
+            disp("Pursuing SortBig");
             move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
             move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
             move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
@@ -297,8 +329,27 @@ try
                 base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
                 elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), rapid_joint_goal(2));
                 wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), rapid_joint_goal(3));
-            end  
-      end
+            end
+         
+          case 'SortSmall' 
+            disp("Pursuing SortSmall");
+            move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+            move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+            move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+
+            pp.write(MOVE_SERV_ID, move_packet);
+            
+            if atLocation(jointAngles, left_joint_goal) || atLocation(jointAngles, right_joint_goal)
+                holding_ball = 0;
+                pp.write(GRIPPER_SERVER_ID, [2 0 0]);
+                armcontrol = 'Rapid';
+                color_hold = '';
+                
+                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), rapid_joint_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), rapid_joint_goal(3));
+            end
+          end
       
       if DEBUG
           disp('Sent Packet:');
