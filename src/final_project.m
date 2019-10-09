@@ -42,8 +42,8 @@ try
   pid_config_packet(2) = 0.00010; % base ki
   pid_config_packet(3) = 0.00002; % base kd
   pid_config_packet(4) = 0.007; % elbow kp
-  pid_config_packet(5) = 0.00006; % elbow ki
-  pid_config_packet(6) = 0.00007; % elbow kd
+  pid_config_packet(5) = 0.00007; % elbow ki
+  pid_config_packet(6) = 0.00008; % elbow kd
   pid_config_packet(7) = 0.00400; % wrist kp
   pid_config_packet(8) = 0.00007; % wrist ki
   pid_config_packet(9) = 0.00002; % wrist kd
@@ -51,16 +51,18 @@ try
   
   joint_tolerance = 5;
   position_tolerance = 3;
-  step = 0.01;
-  total_move_step = 19;
+%   step = 0.01;
+%   total_move_step = 19;
+  step = 0.005;
+  total_move_step = 10;
   
   rapid_packet = zeros(15, 1, 'single');
   left_packet = zeros(15, 1, 'single');
   right_packet = zeros(15, 1, 'single');
   
   rapid_pos_goal = [150 0 300];
-  left_pos_goal = [210 150 0];
-  right_pos_goal = [210 -150 0];
+  left_pos_goal = [210 250 0];
+  right_pos_goal = [210 -250 0];
   
   rapid_joint_goal = ikin(rapid_pos_goal);
   left_joint_goal = ikin(left_pos_goal); 
@@ -93,7 +95,8 @@ try
       pause(0.003);
       returnPacket = pp.read(STATUS_SERV_ID); % gets current position data
       jointAngles = [ticksToAngle(returnPacket(1)) ticksToAngle(returnPacket(2)) ticksToAngle(returnPacket(3))];
-
+      current_position = 1000 * fwkin3001(jointAngles);
+      
       tmp = [green_loc; blue_loc; yellow_loc];
       [green_loc, blue_loc, yellow_loc] = findObjs(current_image, T_cam_to_checker, cameraParams);
       % BALL LOCATIONS ALWAYS USES GREEN BLUE YELLOW AS ITS ORDER
@@ -109,9 +112,9 @@ try
       ball_locations = [green_loc; blue_loc; yellow_loc];
       ball_locations = getCheckerboardToRobot(ball_locations);
       
-      green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) 0]);
-      blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) 0]);
-      yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) 0]);
+      green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) -20]);
+      blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) -20]);
+      yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) -20]);
       
       
       switch armcontrol
@@ -119,12 +122,11 @@ try
           case 'Grn'
             if outsideOfTolerances(previous_ball_locations(1,:), ball_locations(1,:))
                 disp('Recalculating coefficients. . . ');
-                green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) 50]);
+                green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) -20]);
             
-                % add logic in here to determine which goal to go to
-                base_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(1), green_goal(1));
-                elbow_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(2), green_goal(2));
-                wrist_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(3), green_goal(3));
+                base_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(1), green_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(2), green_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(3), green_goal(3));
             
             else
                 move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
@@ -143,12 +145,11 @@ try
           case 'Blu'
             if outsideOfTolerances(previous_ball_locations(2,:), ball_locations(2,:))
                 disp('Recalculating coefficients. . . ');
-                blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) 50]);
+                blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) -20]);
             
-                % add logic in here to determine which goal to go to
-                base_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(1), blue_goal(1));
-                elbow_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(2), blue_goal(2));
-                wrist_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(3), blue_goal(3));
+                base_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(1), blue_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(2), blue_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(3), blue_goal(3));
             
             else
                 move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
@@ -167,12 +168,11 @@ try
           case 'Ylw'
             if outsideOfTolerances(previous_ball_locations(3,:), ball_locations(3,:))
                 disp('Recalculating coefficients. . . ');
-                yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) 50]);
+                yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) -20]);
             
-                % add logic in here to determine which goal to go to
-                base_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(1), yellow_goal(1));
-                elbow_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(2), yellow_goal(2));
-                wrist_coef = trajectory(toc, toc+total_move_step-0.5, 0, 0, jointAngles(3), yellow_goal(3));
+                base_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(1), yellow_goal(1));
+                elbow_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(2), yellow_goal(2));
+                wrist_coef = trajectory(toc, toc+total_move_step-1, 0, 0, jointAngles(3), yellow_goal(3));
             
             else
                 move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
@@ -191,12 +191,7 @@ try
           case 'Grip'
               holding_ball = 1;
               armcontrol = 'Rapid';
-              
-              move_packet(1) = returnPacket(1);
-              move_packet(4) = returnPacket(2);
-              move_packet(7) = returnPacket(3) + 100;
-
-              pp.write(MOVE_SERV_ID, move_packet);
+              grip_step = 1;
               
               pause(1);
 
@@ -237,7 +232,6 @@ try
               end
                 
           case 'Sort' 
-            disp("Persuing Left or Right!");
             move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
             move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
             move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
