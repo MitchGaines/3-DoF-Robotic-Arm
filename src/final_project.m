@@ -63,8 +63,8 @@ try
   right_packet = zeros(15, 1, 'single');
   
   rapid_pos_goal = [200 0 100];
-  left_pos_goal = [0 210 0];
-  right_pos_goal = [0 -210 0];
+  left_pos_goal = [0 250 0];
+  right_pos_goal = [0 -250 0];
   
   rapid_joint_goal = ikin(rapid_pos_goal);
   left_joint_goal = ikin(left_pos_goal); 
@@ -89,6 +89,7 @@ try
   green_loc = [0, 0];
   yellow_loc = [0, 0];
   blue_loc = [0, 0];
+  arc_goal = [0, 0];
   
   while true
       current_image = snapshot(cam);
@@ -125,16 +126,16 @@ try
       ball_locations = [green_loc; blue_loc; yellow_loc];
       ball_locations = getCheckerboardToRobot(ball_locations);
       
-      green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) -20]);
-      blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) -20]);
-      yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) -20]);
+      green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) 10]);
+      blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) 10]);
+      yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) 10]);
       
       switch armcontrol
-          
           case 'Grn'
+            disp("Pursuing Green");
             if outsideOfTolerances(previous_ball_locations(1,:), ball_locations(1,:), 5)
                 disp('Recalculating coefficients. . . ');
-                green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) -20]);
+                green_goal =  ikin([ball_locations(1, 1) ball_locations(1, 2) 10]);
             
                 base_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(1), green_goal(1));
                 elbow_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(2), green_goal(2));
@@ -149,15 +150,16 @@ try
             end
             
             if atLocation(jointAngles, green_goal) 
-                armcontrol = 'Grip';
+                armcontrol = 'Descend';
                 color_hold = 'Grn';
                 color_it = 'Blu';
             end 
             
           case 'Blu'
+            disp("Pursuing Blue");
             if outsideOfTolerances(previous_ball_locations(2,:), ball_locations(2,:), 5)
                 disp('Recalculating coefficients. . . ');
-                blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) -20]);
+                blue_goal = ikin([ball_locations(2, 1) ball_locations(2, 2) 10]);
             
                 base_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(1), blue_goal(1));
                 elbow_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(2), blue_goal(2));
@@ -172,15 +174,16 @@ try
             end
             
             if atLocation(jointAngles, blue_goal) 
-                armcontrol = 'Grip';
+                armcontrol = 'Descend';
                 color_hold = 'Blu';
                 color_it = 'Ylw';
             end 
 
           case 'Ylw'
+            disp("Pursuing Yellow");
             if outsideOfTolerances(previous_ball_locations(3,:), ball_locations(3,:), 5)
                 disp('Recalculating coefficients. . . ');
-                yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) -20]);
+                yellow_goal = ikin([ball_locations(3, 1) ball_locations(3, 2) 10]);
             
                 base_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(1), yellow_goal(1));
                 elbow_coef = trajectory(toc, toc+total_move_step-3, 0, 0, jointAngles(2), yellow_goal(2));
@@ -195,24 +198,44 @@ try
             end
             
             if atLocation(jointAngles, yellow_goal) 
-                armcontrol = 'Grip';
-                color_hold = 'Yellow';
+                armcontrol = 'Descend';
+                color_hold = 'Ylw';
                 color_it = 'Grn';
             end 
             
-          case 'Grip'
-              holding_ball = 1;
-              armcontrol = 'Rapid';
-              grip_step = 1;
+          case 'Descend'
+              disp("Descending");
               
-              pp.write(GRIPPER_SERVER_ID, [1 0 0]);
-              pause(1);
+              arc_goal = ikin([current_position(1) -current_position(2) current_position(3)-35]);
 
-              base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
-              elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), rapid_joint_goal(2));
-              wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), rapid_joint_goal(3));
+              base_coef = trajectory(toc, toc+3, 0, 0, jointAngles(1), arc_goal(1));
+              elbow_coef = trajectory(toc, toc+3, 0, 0, jointAngles(2), arc_goal(2));
+              wrist_coef = trajectory(toc, toc+3, 0, 0, jointAngles(3), arc_goal(3));
               
+              armcontrol = 'Grip';
+              
+          case 'Grip'
+              disp("Pursuing Grip");
+              move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
+              move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
+              move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
+
+              pp.write(MOVE_SERV_ID, move_packet);
+              
+              if atLocation(jointAngles, arc_goal)
+                  holding_ball = 1;
+                  armcontrol = 'Rapid';
+                  grip_step = 1;
+
+                  pp.write(GRIPPER_SERVER_ID, [1 0 0]);
+                  pause(1);
+
+                  base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
+                  elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), rapid_joint_goal(2));
+                  wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), rapid_joint_goal(3));
+              end 
           case 'Rapid'
+              disp("Pursuing Rapid");
               move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
               move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
               move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));
@@ -226,7 +249,20 @@ try
                     elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_joint_goal(2));
                     wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_joint_goal(3));
                   else
-                    armcontrol = color_it;
+                      
+                    if strcmp(color_it, 'Grn') && ~outsideOfTolerances(green_loc, [-478, 528], 40)
+                        color_it = 'Blu';
+                        armcontrol = color_it;
+                    elseif strcmp(color_it, 'Blu') && ~outsideOfTolerances(blue_loc, [-478, 528], 40)
+                        color_it = 'Ylw';
+                        armcontrol = color_it;
+                    elseif strcmp(color_it, 'Ylw') && ~outsideOfTolerances(yellow_loc, [-478, 528], 40)
+                        color_it = 'Grn';
+                        armcontrol = color_it;
+                    else 
+                        armcontrol = color_it;
+                    end
+                    
                     switch color_it
                         case 'Grn'
                             base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), green_goal(1));
@@ -245,6 +281,7 @@ try
               end
                 
           case 'Sort' 
+            disp("Pursuing Sort");
             move_packet(1) = angleToTicks(base_coef(1) + base_coef(2)*(toc+step) + base_coef(3)*((toc+step)^2)  + base_coef(4)*((toc+step)^3));
             move_packet(4) = angleToTicks(elbow_coef(1) + elbow_coef(2)*(toc+step) + elbow_coef(3)*((toc+step)^2)  + elbow_coef(4)*((toc+step)^3));
             move_packet(7) = angleToTicks(wrist_coef(1) + wrist_coef(2)*(toc+step) + wrist_coef(3)*((toc+step)^2)  + wrist_coef(4)*((toc+step)^3));

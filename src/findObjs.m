@@ -56,7 +56,7 @@ function [green_world_location, blue_world_location, yellow_world_location] = fi
 blured_image = imgaussfilt(im, 4);
 
 green_mask = createGreenMask(blured_image);
-yellow_mask = createYellowMask(blured_image);
+yellow_mask = createYellowMask2(blured_image);
 blue_mask = createBlueMask(blured_image);
 
 blobAnalysis = vision.BlobAnalysis('AreaOutputPort', true,...
