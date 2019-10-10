@@ -53,22 +53,31 @@ try
   
   joint_tolerance = 5;
   position_tolerance = 3;
-%   step = 0.01;
-%   total_move_step = 19;
-  step = 0.004;
-  total_move_step = 10;
+  step = 0.0008;
+  total_move_step = 8;
   
   rapid_packet = zeros(15, 1, 'single');
   left_packet = zeros(15, 1, 'single');
   right_packet = zeros(15, 1, 'single');
   
   rapid_pos_goal = [200 0 100];
-  left_pos_goal = [0 300 0];
-  right_pos_goal = [0 -300 0];
+  left_green_pos_goal = [10 305 15];
+  left_blue_pos_goal = [8 208 0];
+  left_yellow_pos_goal = [100 208 0];
+  
+  right_green_pos_goal = [10 -305 15];
+  right_blue_pos_goal = [8 -208 0];
+  right_yellow_pos_goal = [100 -208 0];
   
   rapid_joint_goal = ikin(rapid_pos_goal);
-  left_joint_goal = ikin(left_pos_goal); 
-  right_joint_goal = ikin(right_pos_goal);
+  
+  left_green_joint_goal = ikin(left_green_pos_goal); 
+  left_blue_joint_goal = ikin(left_blue_pos_goal); 
+  left_yellow_joint_goal = ikin(left_yellow_pos_goal); 
+  
+  right_green_joint_goal = ikin(right_green_pos_goal); 
+  right_blue_joint_goal = ikin(right_blue_pos_goal); 
+  right_yellow_joint_goal = ikin(right_yellow_pos_goal); 
 
   previous_ball_locations = zeros(3, 2, 'single');
   
@@ -92,7 +101,7 @@ try
   arc_goal = [0, 0];
   
   %Disk size calculation variables
-  diskMin = 50;
+  diskMin = 55;
   diskMax = 150;
   diskCenter = [0, 0];
   diskRadius = 0;
@@ -129,6 +138,15 @@ try
         % coordinate
         yellow_loc = tmp(3,:);
       end 
+      
+      if strcmp(color_it, '') && ~outsideOfTolerances(green_loc, [-478, 528], 40)
+          color_it = 'Grn';
+      elseif strcmp(color_it, '') && ~outsideOfTolerances(blue_loc, [-478, 528], 40)
+          color_it = 'Blu';
+      elseif strcmp(color_it, '') && ~outsideOfTolerances(yellow_loc, [-478, 528], 40)
+          color_it = 'Ylw';
+      end
+          
       
       ball_locations = [green_loc; blue_loc; yellow_loc];
       ball_locations = getCheckerboardToRobot(ball_locations);
@@ -254,49 +272,58 @@ try
                     armcontrol = 'Classify';
                     
                   else
-                      
-                    if strcmp(color_it, 'Grn') && ~outsideOfTolerances(green_loc, [-478, 528], 40)
+                    if ~outsideOfTolerances(green_loc, [-478, 528], 40) && ...
+                             ~outsideOfTolerances(blue_loc, [-478, 528], 40) && ...
+                             ~outsideOfTolerances(yellow_loc, [-478, 528], 40)
+                        base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), rapid_joint_goal(1));
+                        elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), rapid_joint_goal(2));
+                        wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), rapid_joint_goal(3));
+                        color_it = '';
+                        
+                    elseif (strcmp(color_it, 'Grn') && ~outsideOfTolerances(green_loc, [-478, 528], 40)) || strcmp(color_it, 'Blu')
                         color_it = 'Blu';
                         armcontrol = color_it;
-                    elseif strcmp(color_it, 'Blu') && ~outsideOfTolerances(blue_loc, [-478, 528], 40)
+                        base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), blue_goal(1));
+                        elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), blue_goal(2));
+                        wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), blue_goal(3));
+                    elseif (strcmp(color_it, 'Blu') && ~outsideOfTolerances(blue_loc, [-478, 528], 40)) || strcmp(color_it, 'Ylw')
                         color_it = 'Ylw';
                         armcontrol = color_it;
-                    elseif strcmp(color_it, 'Ylw') && ~outsideOfTolerances(yellow_loc, [-478, 528], 40)
+                        base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), yellow_goal(1));
+                        elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), yellow_goal(2));
+                        wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), yellow_goal(3));
+                    elseif (strcmp(color_it, 'Ylw') && ~outsideOfTolerances(yellow_loc, [-478, 528], 40)) || strcmp(color_it, 'Grn')
                         color_it = 'Grn';
                         armcontrol = color_it;
+                        base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), green_goal(1));
+                        elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), green_goal(2));
+                        wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), green_goal(3));
                     else 
                         armcontrol = color_it;
-                    end
-                    
-                    switch color_it
-                        case 'Grn'
-                            base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), green_goal(1));
-                            elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), green_goal(2));
-                            wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), green_goal(3));
-                        case 'Blu'
-                            base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), blue_goal(1));
-                            elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), blue_goal(2));
-                            wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), blue_goal(3));
-                        case 'Ylw'
-                            base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), yellow_goal(1));
-                            elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), yellow_goal(2));
-                            wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), yellow_goal(3));
-                    end
+                    end 
                   end
                   delay = 0;
               end
               
           case 'Classify'
               if delay == 0
+                  pause(1);
                   delay = 1;
               elseif delay == 1                  
                   disp ("Pursuing Classify");
                   cropped_image = imcrop(current_image, 'logical', [186 101 234 200]);
                   [diskCenter, diskRadius] = imfindcircles(cropped_image,[diskMin diskMax],'ObjectPolarity', 'dark', 'Sensitivity',0.95, 'EdgeThreshold', .1);
-                  if isempty(diskRadius)
+                  
+                  disp("Center");
+                  disp(diskCenter);
+                  disp("Radius");              
+                  disp(diskRadius); 
+                      
+                  if isempty(diskRadius) || diskCenter(1, 1) < 120 || diskCenter(1, 1) > 160 || diskCenter(1,2) < 80 || diskCenter(1,2) > 120
                       armcontrol = color_hold;
                       pp.write(GRIPPER_SERVER_ID, [2 0 0]);
                       switch color_hold
+                          
                         case 'Grn'
                             base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), green_goal(1));
                             elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), green_goal(2));
@@ -309,24 +336,47 @@ try
                             base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), yellow_goal(1));
                             elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), yellow_goal(2));
                             wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), yellow_goal(3));
-                        end
+                      end
+                                              
                   else
-                      disp("Center");
-                      disp(diskCenter);
-                      disp("Radius");              
-                      disp(diskRadius); 
+            
                       if(diskRadius >= 75)
                           diskSize = 1;
                           armcontrol = 'SortBig';
-                          base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_joint_goal(1));
-                          elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_joint_goal(2));
-                          wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_joint_goal(3));
+                          
+                          switch color_hold
+                            case 'Grn'
+                                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_green_joint_goal(1));
+                                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_green_joint_goal(2));
+                                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_green_joint_goal(3));
+                            case 'Blu'
+                                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_blue_joint_goal(1));
+                                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_blue_joint_goal(2));
+                                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_blue_joint_goal(3));
+                            case 'Ylw'
+                                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), left_yellow_joint_goal(1));
+                                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), left_yellow_joint_goal(2));
+                                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), left_yellow_joint_goal(3));
+                          end
+                            
                       else
                           diskSize = 0;
                           armcontrol = 'SortSmall';
-                          base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), right_joint_goal(1));
-                          elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), right_joint_goal(2));
-                          wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), right_joint_goal(3));
+                                                    
+                          switch color_hold
+                            case 'Grn'
+                                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), right_green_joint_goal(1));
+                                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), right_green_joint_goal(2));
+                                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), right_green_joint_goal(3));
+                            case 'Blu'
+                                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), right_blue_joint_goal(1));
+                                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), right_blue_joint_goal(2));
+                                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), right_blue_joint_goal(3));
+                            case 'Ylw'
+                                base_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(1), right_yellow_joint_goal(1));
+                                elbow_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(2), right_yellow_joint_goal(2));
+                                wrist_coef = trajectory(toc, toc+total_move_step, 0, 0, jointAngles(3), right_yellow_joint_goal(3));
+                          end
                       end
                   end 
               end
@@ -339,7 +389,9 @@ try
 
             pp.write(MOVE_SERV_ID, move_packet);
             
-            if atLocation(jointAngles, left_joint_goal) || atLocation(jointAngles, right_joint_goal)
+            if atLocation(jointAngles, left_green_joint_goal) || ...
+                    atLocation(jointAngles, left_blue_joint_goal) || ...
+                    atLocation(jointAngles, left_yellow_joint_goal)
                 holding_ball = 0;
                 pp.write(GRIPPER_SERVER_ID, [2 0 0]);
                 armcontrol = 'Rapid';
@@ -358,7 +410,9 @@ try
 
             pp.write(MOVE_SERV_ID, move_packet);
             
-            if atLocation(jointAngles, left_joint_goal) || atLocation(jointAngles, right_joint_goal)
+            if atLocation(jointAngles, right_green_joint_goal) || ...
+                    atLocation(jointAngles, right_blue_joint_goal) || ...
+                    atLocation(jointAngles, right_yellow_joint_goal)
                 holding_ball = 0;
                 pp.write(GRIPPER_SERVER_ID, [2 0 0]);
                 armcontrol = 'Rapid';
