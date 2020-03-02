@@ -21,13 +21,22 @@ function joint_angles = ikin (end_pos)
     max_wrist = ticksToAngle(2428);
     min_wrist = ticksToAngle(-274);
     
-    if(joint_angles(1) > max_base || joint_angles(1) < min_base)
-        error("Base joint angle out of bounds")
-    elseif(joint_angles(2) > max_elbow || joint_angles(2) < min_elbow)
-        error("Elbow joint angle out of bounds")
-    elseif(joint_angles(3) > max_wrist || joint_angles(3) < min_wrist)
-        error("Wrist joint angle out of bounds")
+    if(joint_angles(1) > max_base)
+        joint_angles(1) = max_base - 1;
+    elseif(joint_angles(1) < min_base)
+        joint_angles(1) = min_base + 1;
     end
-
+        
+    if(joint_angles(2) > max_elbow)
+        joint_angles(2) = max_elbow - 1;
+    elseif(joint_angles(2) < min_elbow)
+        joint_angles(2) = min_elbow + 1; 
+    end
+    
+    if(joint_angles(3) > max_wrist)
+        joint_angles(3) = max_wrist - 1;
+    elseif(joint_angles(3) < min_wrist)
+        joint_angles(3) = min_wrist + 1;
+    end
 end
 
